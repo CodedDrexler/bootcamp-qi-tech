@@ -99,3 +99,122 @@ class InvalidBirthdate(QIException):
         description = f"The birthdate {birthdate} is not a real date."
         translation = "A data de nascimento informada não existe."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+# ============================================================================
+# Domínio bancário
+# ============================================================================
+
+
+class ClientNotFound(QIException):
+    code = "QIT002001"
+
+    def __init__(self, client_key) -> None:
+        title = "Client not found"
+        http_status = 404
+        description = f"Client with key {client_key} was not found."
+        translation = "O cliente informado não foi encontrado."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidClientDocumentNumber(QIException):
+    code = "QIT002002"
+
+    def __init__(self, document_number) -> None:
+        title = "Invalid client document number"
+        http_status = 422
+        description = f"The document number {document_number} is not a valid CPF."
+        translation = "O CPF informado não é válido."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class DuplicatedClientDocumentNumber(QIException):
+    code = "QIT002003"
+
+    def __init__(self, document_number) -> None:
+        title = "Client document already registered"
+        http_status = 409
+        description = f"There is already a client with the document number {document_number}."
+        translation = "Já existe um cliente com este CPF."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidClientBirthDate(QIException):
+    code = "QIT002004"
+
+    def __init__(self, birth_date) -> None:
+        title = "Invalid client birth date"
+        http_status = 422
+        description = f"The birth date {birth_date} is not a real date."
+        translation = "A data de nascimento informada não existe."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class UnderageClient(QIException):
+    code = "QIT002005"
+
+    def __init__(self, age, minimum_age) -> None:
+        title = "Client is underage"
+        http_status = 422
+        description = f"The client is {age} years old, and the minimum is {minimum_age}."
+        translation = f"É preciso ter pelo menos {minimum_age} anos para abrir conta neste MVP."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountNotFound(QIException):
+    code = "QIT003001"
+
+    def __init__(self, account_key) -> None:
+        title = "Account not found"
+        http_status = 404
+        description = f"Account with key {account_key} was not found."
+        translation = "A conta informada não foi encontrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InsufficientBalance(QIException):
+    code = "QIT004001"
+
+    def __init__(self, available_balance, required_amount) -> None:
+        title = "Insufficient balance"
+        http_status = 422
+        description = (
+            f"Available balance is {available_balance} cents, but {required_amount} cents are required."
+        )
+        translation = "Saldo insuficiente para concluir a transferência e a tarifa."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class SameAccountTransfer(QIException):
+    code = "QIT004002"
+
+    def __init__(self) -> None:
+        title = "Invalid transfer accounts"
+        http_status = 409
+        description = "Origin and destination accounts must be different."
+        translation = "A conta de origem e a conta de destino devem ser diferentes."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class RequestControlKeyConflict(QIException):
+    code = "QIT004003"
+
+    def __init__(self, request_control_key) -> None:
+        title = "Idempotency key conflict"
+        http_status = 409
+        description = (
+            f"The request_control_key {request_control_key} was already used by a different operation."
+        )
+        translation = "A chave de idempotência já foi usada por uma operação diferente."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class MissingClientIdentity(QIException):
+    code = "QIT005001"
+
+    def __init__(self) -> None:
+        title = "Client identity required"
+        http_status = 401
+        description = "The trusted X-CLIENT-KEY identity header is required for this resource."
+        translation = "A identidade do cliente é obrigatória para acessar este recurso."
+        super().__init__(title, self.code, http_status, description, translation)

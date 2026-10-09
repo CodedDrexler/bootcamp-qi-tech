@@ -1,3 +1,19 @@
+# Desafio bancário — Bootcamp QI Tech 2026
+
+Este repositório parte do `bootcamp-base-api` oficial e preserva sua arquitetura. O domínio
+bancário implementado está documentado em:
+
+- [`README_BANK.md`](README_BANK.md) — visão rápida e comandos;
+- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) — contratos HTTP;
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — decisões e trade-offs vivos;
+- [`docs/RFC.md`](docs/RFC.md) — RFC em evolução;
+- [`docs/IMPLEMENTATION_GUIDE.md`](docs/IMPLEMENTATION_GUIDE.md) — execução e testes.
+
+O conteúdo didático original do projeto-base continua abaixo para preservar a referência
+fornecida pela QI Tech.
+
+---
+
 # Bootcamp QI Tech — projeto base da API
 
 Projeto base do Bootcamp: uma API REST em **Python + FastAPI**, com banco

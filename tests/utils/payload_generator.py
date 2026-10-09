@@ -47,3 +47,50 @@ class PayloadGenerator:
     def create_new_status_payload(new_status: str = None) -> dict:
         payload = {"status": new_status}
         return payload
+
+    @staticmethod
+    def create_client_payload(
+        name: str = None,
+        document_number: str = None,
+        birth_date: str = None,
+    ) -> dict:
+        if name is None:
+            name = "Ana Souza"
+        if document_number is None:
+            document_number = RandomGenerator.generate_cpf()
+        if birth_date is None:
+            birth_date = "1994-03-12"
+        return {
+            "name": name,
+            "document_number": document_number,
+            "birth_date": birth_date,
+        }
+
+    @staticmethod
+    def create_deposit_payload(
+        amount: int = 50000,
+        request_control_key: str = None,
+    ) -> dict:
+        if request_control_key is None:
+            request_control_key = str(uuid4())
+        return {
+            "request_control_key": request_control_key,
+            "type": "deposit",
+            "amount": amount,
+        }
+
+    @staticmethod
+    def create_transfer_payload(
+        destination_account_key: str,
+        amount: int = 20000,
+        request_control_key: str = None,
+    ) -> dict:
+        if request_control_key is None:
+            request_control_key = str(uuid4())
+        return {
+            "request_control_key": request_control_key,
+            "type": "transfer",
+            "amount": amount,
+            "destination_account_key": destination_account_key,
+        }
+

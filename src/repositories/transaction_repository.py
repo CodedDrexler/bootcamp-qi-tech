@@ -1,0 +1,99 @@
+from uuid import uuid4
+
+from sqlalchemy import or_
+
+from database import Context
+from models import BankTransaction, TransactionType
+
+
+class TransactionRepository:
+    """Persistência append-only das movimentações financeiras."""
+
+    def __init__(self, context: Context) -> None:
+        self.session = context.db_session
+
+    def get_type(self, enumerator: str) -> TransactionType:
+        return (
+            self.session.query(TransactionType)
+            .filter(TransactionType.enumerator == enumerator)
+            .one()
+        )
+
+    def create_deposit(
+        self,
+        destination_account,
+        amount: int,
+        request_control_key: str,
+        operation_key: str | None = None,
+    ) -> BankTransaction:
+        transaction = BankTransaction()
+        transaction.transaction_key = str(uuid4())
+        transaction.operation_key = operation_key or str(uuid4())
+        transaction.request_control_key = request_control_key
+        transaction.type = self.get_type(TransactionType.DEPOSIT)
+        transaction.destination_account = destination_account
+        transaction.amount = amount
+        self.session.add(transaction)
+        return transaction
+
+    def create_transfer(
+        self,
+        origin_account,
+        destination_account,
+        amount: int,
+        request_control_key: str,
+        operation_key: str | None = None,
+    ) -> BankTransaction:
+        transaction = BankTransaction()
+        transaction.transaction_key = str(uuid4())
+        transaction.operation_key = operation_key or str(uuid4())
+        transaction.request_control_key = request_control_key
+        transaction.type = self.get_type(TransactionType.TRANSFER)
+        transaction.origin_account = origin_account
+        transaction.destination_account = destination_account
+        transaction.amount = amount
+        self.session.add(transaction)
+        return transaction
+
+    def create_fee(self, origin_account, amount: int, operation_key: str) -> BankTransaction:
+        transaction = BankTransaction()
+        transaction.transaction_key = str(uuid4())
+        transaction.operation_key = operation_key
+        transaction.request_control_key = None
+        transaction.type = self.get_type(TransactionType.FEE)
+        transaction.origin_account = origin_account
+        transaction.amount = amount
+        self.session.add(transaction)
+        return transaction
+
+    def get_by_request_control_key(self, request_control_key: str) -> BankTransaction:
+        return (
+            self.session.query(BankTransaction)
+            .filter(BankTransaction.request_control_key == request_control_key)
+            .first()
+        )
+
+    def get_fee_by_operation_key(self, operation_key: str) -> BankTransaction:
+        return (
+            self.session.query(BankTransaction)
+            .join(BankTransaction.type)
+            .filter(
+                BankTransaction.operation_key == operation_key,
+                TransactionType.enumerator == TransactionType.FEE,
+            )
+            .first()
+        )
+
+    def list_page_for_account(self, account_id: int, limit: int, offset: int) -> list[BankTransaction]:
+        query = (
+            self.session.query(BankTransaction)
+            .filter(
+                or_(
+                    BankTransaction.origin_account_id == account_id,
+                    BankTransaction.destination_account_id == account_id,
+                )
+            )
+            .order_by(BankTransaction.created_at.desc(), BankTransaction.id.desc())
+        )
+
+        return query.limit(limit + 1).offset(offset).all()
