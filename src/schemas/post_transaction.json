@@ -7,14 +7,21 @@
       "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
     },
     "type": {
-      "enum": ["deposit", "transfer"]
+      "enum": [
+        "deposit",
+        "transfer"
+      ]
     },
     "amount": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 100000000000000
+      "maximum": 100000000
     },
     "destination_account_key": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "funding_reference": {
       "type": "string",
       "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
     }
@@ -28,18 +35,40 @@
   "allOf": [
     {
       "if": {
-        "properties": {"type": {"const": "transfer"}}
+        "properties": {
+          "type": {
+            "const": "transfer"
+          }
+        }
       },
       "then": {
-        "required": ["destination_account_key"]
+        "required": [
+          "destination_account_key"
+        ],
+        "not": {
+          "required": [
+            "funding_reference"
+          ]
+        }
       }
     },
     {
       "if": {
-        "properties": {"type": {"const": "deposit"}}
+        "properties": {
+          "type": {
+            "const": "deposit"
+          }
+        }
       },
       "then": {
-        "not": {"required": ["destination_account_key"]}
+        "required": [
+          "funding_reference"
+        ],
+        "not": {
+          "required": [
+            "destination_account_key"
+          ]
+        }
       }
     }
   ]

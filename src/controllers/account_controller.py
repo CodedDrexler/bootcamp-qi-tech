@@ -1,11 +1,22 @@
+from sqlalchemy.exc import IntegrityError
+
 from controllers.base_controller import BaseController
 from dtos import AccountDTO
-from errors import AccountNotFound, ClientNotFound, MissingClientIdentity
+from errors import (
+    AccountAlreadyExists,
+    AccountFinalStatus,
+    AccountMustHaveZeroBalanceToClose,
+    AccountNotFound,
+    ClientNotFound,
+    InvalidAccountLimits,
+    MissingClientIdentity,
+)
+from models import AccountStatus
 from repositories import AccountRepository, ClientRepository
 
 
 class AccountController(BaseController):
-    """Criação e consulta de contas vinculadas a um cliente."""
+    """Criação, consulta e configuração operacional de contas."""
 
     def __init__(self) -> None:
         super().__init__(__name__)
@@ -22,7 +33,19 @@ class AccountController(BaseController):
         if client is None:
             raise ClientNotFound(client_key)
 
+        if self.account_repository.get_by_client_id(client.id) is not None:
+            raise AccountAlreadyExists(client_key)
+
         account = self.account_repository.create(client)
+
+        try:
+            self.session.flush()
+        except IntegrityError:
+            self.session.rollback()
+            if self.account_repository.get_by_client_id(client.id) is not None:
+                raise AccountAlreadyExists(client_key)
+            raise
+
         account_dto = AccountDTO.only_key(account)
         self.session.commit()
         return account_dto
@@ -32,10 +55,43 @@ class AccountController(BaseController):
 
         account = self.account_repository.get_by_key(account_key)
         if account is None or account.client.client_key != requester_client_key:
-            # Mesmo erro para conta inexistente e conta alheia: evita IDOR.
             raise AccountNotFound(account_key)
 
         return AccountDTO.obj_to_dict(account)
+
+    def update_limits(self, account_key: str, limits: dict) -> dict:
+        account = self.account_repository.get_by_key(account_key)
+        if account is None:
+            raise AccountNotFound(account_key)
+
+        single = limits["single_transfer_limit"]
+        daily = limits["daily_transfer_limit"]
+        if daily < single:
+            raise InvalidAccountLimits()
+
+        self.account_repository.update_limits(account, single, daily)
+        response = AccountDTO.limits(account)
+        self.session.commit()
+        return response
+
+    def update_status(self, account_key: str, new_status: str) -> dict:
+        account = self.account_repository.get_by_key(account_key)
+        if account is None:
+            raise AccountNotFound(account_key)
+
+        old_status = account.status.enumerator
+        if old_status == AccountStatus.CLOSED and new_status != AccountStatus.CLOSED:
+            raise AccountFinalStatus(old_status, new_status)
+
+        if new_status == AccountStatus.CLOSED and account.balance != 0:
+            raise AccountMustHaveZeroBalanceToClose(account_key, account.balance)
+
+        if old_status != new_status:
+            self.account_repository.update_status(account, new_status)
+
+        response = AccountDTO.status(account)
+        self.session.commit()
+        return response
 
     def _require_identity(self, requester_client_key: str | None) -> None:
         if requester_client_key is None or requester_client_key == "":

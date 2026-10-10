@@ -4,6 +4,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from controllers import AccountController
+from utils.schema_handler import SchemaHandler
 
 
 class AccountResource:
@@ -13,10 +14,7 @@ class AccountResource:
             client_key=client_key,
             requester_client_key=request.headers.get("X-CLIENT-KEY"),
         )
-        return JSONResponse(
-            content=jsonable_encoder(account),
-            status_code=http_status.HTTP_201_CREATED,
-        )
+        return JSONResponse(content=jsonable_encoder(account), status_code=http_status.HTTP_201_CREATED)
 
     def on_get_by_key(self, request: Request, account_key: str) -> JSONResponse:
         controller = AccountController()
@@ -24,7 +22,16 @@ class AccountResource:
             account_key=account_key,
             requester_client_key=request.headers.get("X-CLIENT-KEY"),
         )
-        return JSONResponse(
-            content=jsonable_encoder(account),
-            status_code=http_status.HTTP_200_OK,
-        )
+        return JSONResponse(content=jsonable_encoder(account), status_code=http_status.HTTP_200_OK)
+
+    @SchemaHandler.validate("put_account_limits.json")
+    def on_put_limits(self, account_key: str, payload: dict) -> JSONResponse:
+        controller = AccountController()
+        limits = controller.update_limits(account_key, payload)
+        return JSONResponse(content=jsonable_encoder(limits), status_code=http_status.HTTP_200_OK)
+
+    @SchemaHandler.validate("put_account_status.json")
+    def on_put_status(self, account_key: str, payload: dict) -> JSONResponse:
+        controller = AccountController()
+        account = controller.update_status(account_key, payload["status"])
+        return JSONResponse(content=jsonable_encoder(account), status_code=http_status.HTTP_200_OK)

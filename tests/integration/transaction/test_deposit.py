@@ -128,3 +128,45 @@ class TestDeposit:
         assert status == 404
         assert response["code"] == "QIT003001"
 
+
+
+class TestDepositFundingProvenance:
+    def test_deposit_requires_confirmed_funding_reference(self):
+        client, account = ObjectGenerator.create_client_with_account()
+        payload = PayloadGenerator.create_deposit_payload(amount=1000)
+        payload.pop("funding_reference")
+        status, response = RequestGenerator.POST_transaction(account["account_key"], payload, client["client_key"])
+        assert status == 400
+        assert response["code"] == "QIT000001"
+
+    def test_same_funding_reference_cannot_credit_twice_with_new_request_key(self):
+        client, account = ObjectGenerator.create_client_with_account()
+        funding_reference = str(uuid4())
+        first = PayloadGenerator.create_deposit_payload(amount=1000, funding_reference=funding_reference)
+        second = PayloadGenerator.create_deposit_payload(amount=1000, funding_reference=funding_reference)
+
+        status, _ = RequestGenerator.POST_transaction(account["account_key"], first, client["client_key"])
+        assert status == 201
+        status, response = RequestGenerator.POST_transaction(account["account_key"], second, client["client_key"])
+        assert status == 409
+        assert response["code"] == "QIT004006"
+        _, current = RequestGenerator.GET_account(account["account_key"], client["client_key"])
+        assert current["balance"] == 1000
+
+    def test_blocked_account_cannot_receive_confirmed_funding(self):
+        client, account = ObjectGenerator.create_client_with_account()
+        RequestGenerator.PUT_account_status(account["account_key"], "blocked")
+        payload = PayloadGenerator.create_deposit_payload(amount=1000)
+        status, response = RequestGenerator.POST_transaction(account["account_key"], payload, client["client_key"])
+        assert status == 423
+        assert response["code"] == "QIT003003"
+
+    def test_committed_deposit_replay_survives_later_account_block(self):
+        client, account = ObjectGenerator.create_client_with_account()
+        payload = PayloadGenerator.create_deposit_payload(amount=1000)
+        status, first = RequestGenerator.POST_transaction(account["account_key"], payload, client["client_key"])
+        assert status == 201
+        RequestGenerator.PUT_account_status(account["account_key"], "blocked")
+        status, replay = RequestGenerator.POST_transaction(account["account_key"], payload, client["client_key"])
+        assert status == 201
+        assert replay == first

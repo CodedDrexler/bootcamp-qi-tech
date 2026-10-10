@@ -12,6 +12,7 @@ from errors.base_error import (
     NotFoundResource,
 )
 from utils.logger import get_logger
+from utils.structured_log import emit_event
 
 
 logger = get_logger(__name__)
@@ -51,15 +52,38 @@ def register_error_handlers(application: FastAPI) -> None:
 
     @application.exception_handler(QIException)
     def handle_qi_exception(request: Request, exception: QIException) -> JSONResponse:
+        emit_event(
+            "business_error",
+            code=exception.code,
+            http_status=exception.http_status,
+            method=request.method,
+            path=request.url.path,
+        )
         return qi_exception_to_response(exception)
 
     @application.exception_handler(StarletteHTTPException)
     def handle_http_exception(request: Request, exception: StarletteHTTPException) -> JSONResponse:
         if exception.status_code == 404:
-            return qi_exception_to_response(NotFoundResource())
+            named_error = NotFoundResource()
+            emit_event(
+                "business_error",
+                code=named_error.code,
+                http_status=named_error.http_status,
+                method=request.method,
+                path=request.url.path,
+            )
+            return qi_exception_to_response(named_error)
 
         if exception.status_code == 405:
-            return qi_exception_to_response(MethodNotAllowed())
+            named_error = MethodNotAllowed()
+            emit_event(
+                "business_error",
+                code=named_error.code,
+                http_status=named_error.http_status,
+                method=request.method,
+                path=request.url.path,
+            )
+            return qi_exception_to_response(named_error)
 
         logger.error(f"HTTP {exception.status_code} em {request.url.path}: {exception.detail}")
         return qi_exception_to_response(InternalError())
@@ -97,5 +121,13 @@ def register_error_handlers(application: FastAPI) -> None:
 
     @application.exception_handler(Exception)
     def handle_unexpected_error(request: Request, exception: Exception) -> JSONResponse:
+        emit_event(
+            "unexpected_error",
+            level="error",
+            code="QIT000500",
+            http_status=500,
+            method=request.method,
+            path=request.url.path,
+        )
         logger.exception(f"Erro inesperado em {request.method} {request.url.path}")
         return qi_exception_to_response(InternalError())

@@ -1,10 +1,14 @@
 from datetime import date
 
+from sqlalchemy.exc import IntegrityError
+
 from controllers.base_controller import BaseController
+from constants import MINIMUM_CLIENT_AGE
 from dtos import ClientDTO
 from errors import (
     ClientNotFound,
     DuplicatedClientDocumentNumber,
+    FutureClientBirthDate,
     InvalidClientBirthDate,
     InvalidClientDocumentNumber,
     MissingClientIdentity,
@@ -12,9 +16,6 @@ from errors import (
 )
 from repositories import ClientRepository
 from utils.document_number import is_valid_cpf
-
-
-MINIMUM_CLIENT_AGE = 18
 
 
 class ClientController(BaseController):
@@ -31,6 +32,9 @@ class ClientController(BaseController):
         if not is_valid_cpf(document_number):
             raise InvalidClientDocumentNumber(document_number)
 
+        if birth_date > date.today():
+            raise FutureClientBirthDate(client_data["birth_date"])
+
         if self.client_repository.get_by_document_number(document_number) is not None:
             raise DuplicatedClientDocumentNumber(document_number)
 
@@ -39,6 +43,17 @@ class ClientController(BaseController):
             raise UnderageClient(age, MINIMUM_CLIENT_AGE)
 
         client = self.client_repository.create(client_data)
+
+        # A checagem acima melhora a mensagem no caso comum; o UNIQUE do
+        # banco fecha a corrida de duas requisições simultâneas com o mesmo CPF.
+        try:
+            self.session.flush()
+        except IntegrityError:
+            self.session.rollback()
+            if self.client_repository.get_by_document_number(document_number) is not None:
+                raise DuplicatedClientDocumentNumber(document_number)
+            raise
+
         client_dto = ClientDTO.only_key(client)
         self.session.commit()
         return client_dto

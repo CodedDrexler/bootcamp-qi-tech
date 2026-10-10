@@ -70,13 +70,17 @@ class PayloadGenerator:
     def create_deposit_payload(
         amount: int = 50000,
         request_control_key: str = None,
+        funding_reference: str = None,
     ) -> dict:
         if request_control_key is None:
             request_control_key = str(uuid4())
+        if funding_reference is None:
+            funding_reference = str(uuid4())
         return {
             "request_control_key": request_control_key,
             "type": "deposit",
             "amount": amount,
+            "funding_reference": funding_reference,
         }
 
     @staticmethod

@@ -208,3 +208,129 @@ class TestTransfer:
         )
         assert origin["balance"] == 19800
         assert destination["balance"] == 10000
+
+
+class TestTransferRiskControls:
+    def test_transfer_at_single_limit_is_accepted(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        _receiver, destination = ObjectGenerator.create_client_with_account()
+        RequestGenerator.PUT_account_limits(
+            origin["account_key"], {"single_transfer_limit": 10000, "daily_transfer_limit": 30000}
+        )
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 20000)
+        payload = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=10000)
+        status, _ = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 201
+
+    def test_transfer_above_single_limit_has_no_financial_effect(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        receiver, destination = ObjectGenerator.create_client_with_account()
+        RequestGenerator.PUT_account_limits(
+            origin["account_key"], {"single_transfer_limit": 10000, "daily_transfer_limit": 30000}
+        )
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 50000)
+        payload = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=10001)
+        status, response = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 422
+        assert response["code"] == "QIT004004"
+        _, origin_after = RequestGenerator.GET_account(origin["account_key"], owner["client_key"])
+        _, destination_after = RequestGenerator.GET_account(destination["account_key"], receiver["client_key"])
+        assert origin_after["balance"] == 50000
+        assert destination_after["balance"] == 0
+
+    def test_daily_limit_accumulates_only_transfer_amounts(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        receiver, destination = ObjectGenerator.create_client_with_account()
+        RequestGenerator.PUT_account_limits(
+            origin["account_key"], {"single_transfer_limit": 10000, "daily_transfer_limit": 15000}
+        )
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 50000)
+
+        first = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=10000)
+        status, _ = RequestGenerator.POST_transaction(origin["account_key"], first, owner["client_key"])
+        assert status == 201
+
+        second = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=5001)
+        status, response = RequestGenerator.POST_transaction(origin["account_key"], second, owner["client_key"])
+        assert status == 422
+        assert response["code"] == "QIT004005"
+
+        _, origin_after = RequestGenerator.GET_account(origin["account_key"], owner["client_key"])
+        _, destination_after = RequestGenerator.GET_account(destination["account_key"], receiver["client_key"])
+        assert origin_after["balance"] == 39800
+        assert destination_after["balance"] == 10000
+
+    def test_concurrent_transfers_cannot_bypass_daily_limit(self):
+        DbUtils.rollback()
+        owner, origin = ObjectGenerator.create_client_with_account()
+        _receiver_a, destination_a = ObjectGenerator.create_client_with_account()
+        _receiver_b, destination_b = ObjectGenerator.create_client_with_account()
+        RequestGenerator.PUT_account_limits(
+            origin["account_key"], {"single_transfer_limit": 10000, "daily_transfer_limit": 10000}
+        )
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 30000)
+        payloads = [
+            PayloadGenerator.create_transfer_payload(destination_a["account_key"], amount=8000),
+            PayloadGenerator.create_transfer_payload(destination_b["account_key"], amount=8000),
+        ]
+
+        def send(payload):
+            return RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(send, payloads))
+
+        assert sorted(status for status, _body in results) == [201, 422]
+        rejected = [body for status, body in results if status == 422]
+        assert rejected[0]["code"] == "QIT004005"
+
+        _status, origin_after = RequestGenerator.GET_account(origin["account_key"], owner["client_key"])
+        assert origin_after["balance"] == 21800
+
+    def test_limit_check_does_not_replace_balance_check(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        _receiver, destination = ObjectGenerator.create_client_with_account()
+        RequestGenerator.PUT_account_limits(
+            origin["account_key"], {"single_transfer_limit": 10000, "daily_transfer_limit": 20000}
+        )
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 10000)
+        payload = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=10000)
+        status, response = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 422
+        assert response["code"] == "QIT004001"
+
+    def test_blocked_origin_cannot_transfer(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        _receiver, destination = ObjectGenerator.create_client_with_account()
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 20000)
+        RequestGenerator.PUT_account_status(origin["account_key"], "blocked")
+        payload = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=1000)
+        status, response = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 423
+        assert response["code"] == "QIT003003"
+
+    def test_blocked_destination_cannot_receive_transfer(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        receiver, destination = ObjectGenerator.create_client_with_account()
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 20000)
+        RequestGenerator.PUT_account_status(destination["account_key"], "blocked")
+        payload = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=1000)
+        status, response = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 423
+        assert response["code"] == "QIT003003"
+        _, origin_after = RequestGenerator.GET_account(origin["account_key"], owner["client_key"])
+        _, destination_after = RequestGenerator.GET_account(destination["account_key"], receiver["client_key"])
+        assert origin_after["balance"] == 20000
+        assert destination_after["balance"] == 0
+
+    def test_committed_transfer_replay_survives_later_account_block(self):
+        owner, origin = ObjectGenerator.create_client_with_account()
+        _receiver, destination = ObjectGenerator.create_client_with_account()
+        ObjectGenerator.deposit(origin["account_key"], owner["client_key"], 20000)
+        payload = PayloadGenerator.create_transfer_payload(destination["account_key"], amount=1000)
+        status, first = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 201
+        RequestGenerator.PUT_account_status(origin["account_key"], "blocked")
+        status, replay = RequestGenerator.POST_transaction(origin["account_key"], payload, owner["client_key"])
+        assert status == 201
+        assert replay == first

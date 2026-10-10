@@ -11,6 +11,7 @@ class BankTransaction(Base):
     transaction_key = Column(CHAR(36), nullable=False)
     operation_key = Column(CHAR(36), nullable=False)
     request_control_key = Column(CHAR(36), nullable=True)
+    external_reference = Column(CHAR(36), nullable=True)
     type_id = Column(Integer, ForeignKey("transaction_type.id"), nullable=False)
     origin_account_id = Column(Integer, ForeignKey("account.id"), nullable=True)
     destination_account_id = Column(Integer, ForeignKey("account.id"), nullable=True)
@@ -20,7 +21,13 @@ class BankTransaction(Base):
     __table_args__ = (
         UniqueConstraint("transaction_key"),
         UniqueConstraint("request_control_key"),
+        UniqueConstraint("external_reference"),
+        UniqueConstraint("operation_key", "type_id", name="bank_transaction_operation_type_unique"),
         CheckConstraint("amount > 0", name="bank_transaction_amount_positive"),
+        CheckConstraint(
+            "amount <= 100000000",
+            name="bank_transaction_amount_contract_max",
+        ),
         CheckConstraint(
             "origin_account_id IS NOT NULL OR destination_account_id IS NOT NULL",
             name="bank_transaction_has_account",

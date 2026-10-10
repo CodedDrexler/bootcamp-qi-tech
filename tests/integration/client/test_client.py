@@ -1,6 +1,7 @@
-from datetime import date
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 
-from tests.utils import ObjectGenerator, PayloadGenerator, RequestGenerator
+from tests.utils import DbUtils, ObjectGenerator, PayloadGenerator, RequestGenerator
 
 
 def birth_date_for_age(age: int) -> str:
@@ -85,3 +86,61 @@ class TestClient:
         )
         assert status == 404
         assert response["code"] == "QIT002001"
+
+
+    def test_exactly_eighteen_years_old_is_accepted(self):
+        today = date.today()
+        try:
+            birthday = today.replace(year=today.year - 18)
+        except ValueError:
+            birthday = today.replace(year=today.year - 18, day=28)
+
+        payload = PayloadGenerator.create_client_payload(birth_date=birthday.isoformat())
+        status, _ = RequestGenerator.POST_client(payload)
+        assert status == 201
+
+    def test_client_still_under_eighteen_near_boundary_is_rejected(self):
+        today = date.today()
+        try:
+            eighteenth_birthday = today.replace(year=today.year - 18)
+        except ValueError:
+            eighteenth_birthday = today.replace(year=today.year - 18, day=28)
+        # O runner Windows e a API Linux podem estar em datas diferentes perto
+        # da meia-noite. Uma margem de 7 dias preserva a regra que queremos
+        # provar sem acoplar o teste ao fuso horario da maquina.
+        birth_date = eighteenth_birthday + timedelta(days=7)
+
+        payload = PayloadGenerator.create_client_payload(birth_date=birth_date.isoformat())
+        status, response = RequestGenerator.POST_client(payload)
+        assert status == 422
+        assert response["code"] == "QIT002005"
+
+    def test_future_birth_date_has_specific_business_error(self):
+        # Mesmo motivo: nao usar +1 dia em teste black-box entre processos
+        # que podem estar em fusos diferentes.
+        future = date.today() + timedelta(days=7)
+        payload = PayloadGenerator.create_client_payload(birth_date=future.isoformat())
+        status, response = RequestGenerator.POST_client(payload)
+        assert status == 422
+        assert response["code"] == "QIT002006"
+
+    def test_unknown_client_returns_404(self):
+        unknown = "00000000-0000-4000-8000-000000000000"
+        status, response = RequestGenerator.GET_client(unknown, unknown)
+        assert status == 404
+        assert response["code"] == "QIT002001"
+
+    def test_two_concurrent_creates_with_same_cpf_create_only_one_client(self):
+        DbUtils.rollback()
+        payload = PayloadGenerator.create_client_payload()
+
+        def create(_):
+            return RequestGenerator.POST_client(payload)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(create, [0, 1]))
+
+        statuses = sorted(status for status, _ in results)
+        assert statuses == [201, 409]
+        duplicate = next(body for status, body in results if status == 409)
+        assert duplicate["code"] == "QIT002003"

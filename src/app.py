@@ -10,6 +10,7 @@ from middlewares import (
     register_session_manager_middleware,
 )
 from resources import (
+    BillingConfigurationResource,
     AccountResource,
     ClientResource,
     HealthCheckResource,
@@ -133,6 +134,7 @@ def create_app() -> FastAPI:
     client_resource = ClientResource()
     account_resource = AccountResource()
     transaction_resource = TransactionResource()
+    billing_configuration_resource = BillingConfigurationResource()
 
     application.add_api_route("/", health_check_resource.on_get_home, methods=["GET"])
     application.add_api_route(
@@ -187,6 +189,26 @@ def create_app() -> FastAPI:
         "/account/{account_key}",
         account_resource.on_get_by_key,
         methods=["GET"],
+    )
+    application.add_api_route(
+        "/account/{account_key}/limits",
+        account_resource.on_put_limits,
+        methods=["PUT"],
+    )
+    application.add_api_route(
+        "/webhook/account/{account_key}/status",
+        account_resource.on_put_status,
+        methods=["PUT"],
+    )
+    application.add_api_route(
+        "/billing_configuration/transfer",
+        billing_configuration_resource.on_get_transfer,
+        methods=["GET"],
+    )
+    application.add_api_route(
+        "/billing_configuration/transfer",
+        billing_configuration_resource.on_put_transfer,
+        methods=["PUT"],
     )
     application.add_api_route(
         "/account/{account_key}/transaction",

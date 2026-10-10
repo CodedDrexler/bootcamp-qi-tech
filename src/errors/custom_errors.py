@@ -161,6 +161,19 @@ class UnderageClient(QIException):
         super().__init__(title, self.code, http_status, description, translation)
 
 
+
+
+class FutureClientBirthDate(QIException):
+    code = "QIT002006"
+
+    def __init__(self, birth_date) -> None:
+        title = "Client birth date is in the future"
+        http_status = 422
+        description = f"The birth date {birth_date} is in the future."
+        translation = "A data de nascimento não pode estar no futuro."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class AccountNotFound(QIException):
     code = "QIT003001"
 
@@ -169,6 +182,19 @@ class AccountNotFound(QIException):
         http_status = 404
         description = f"Account with key {account_key} was not found."
         translation = "A conta informada não foi encontrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+
+
+class AccountAlreadyExists(QIException):
+    code = "QIT003002"
+
+    def __init__(self, client_key) -> None:
+        title = "Account already exists"
+        http_status = 409
+        description = f"Client {client_key} already has an account in this MVP."
+        translation = "Este cliente já possui uma conta."
         super().__init__(title, self.code, http_status, description, translation)
 
 
@@ -206,6 +232,86 @@ class RequestControlKeyConflict(QIException):
             f"The request_control_key {request_control_key} was already used by a different operation."
         )
         translation = "A chave de idempotência já foi usada por uma operação diferente."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountNotOperational(QIException):
+    code = "QIT003003"
+
+    def __init__(self, account_key, account_status) -> None:
+        title = "Account is not operational"
+        http_status = 423
+        description = f"Account {account_key} is {account_status} and cannot perform this operation."
+        translation = "Contas bloqueadas ou encerradas não podem realizar esta operação."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountMustHaveZeroBalanceToClose(QIException):
+    code = "QIT003004"
+
+    def __init__(self, account_key, balance) -> None:
+        title = "Account cannot be closed with balance"
+        http_status = 409
+        description = f"Account {account_key} has {balance} cents and must reach zero before closing."
+        translation = "A conta precisa estar com saldo zero para ser encerrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountFinalStatus(QIException):
+    code = "QIT003005"
+
+    def __init__(self, old_status, new_status) -> None:
+        title = "Account status cannot change"
+        http_status = 409
+        description = f"Account with status {old_status} cannot update to {new_status}."
+        translation = "Uma conta encerrada não pode mudar de status."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidAccountLimits(QIException):
+    code = "QIT003006"
+
+    def __init__(self) -> None:
+        title = "Invalid account limits"
+        http_status = 422
+        description = "Daily transfer limit must be greater than or equal to the single transfer limit."
+        translation = "O limite diário deve ser maior ou igual ao limite por transferência."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class TransferLimitExceeded(QIException):
+    code = "QIT004004"
+
+    def __init__(self, amount, limit) -> None:
+        title = "Transfer limit exceeded"
+        http_status = 422
+        description = f"Transfer amount is {amount} cents and the account limit is {limit} cents."
+        translation = "O valor da transferência excede o limite por operação da conta."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class DailyTransferLimitExceeded(QIException):
+    code = "QIT004005"
+
+    def __init__(self, amount_today, requested_amount, daily_limit) -> None:
+        title = "Daily transfer limit exceeded"
+        http_status = 422
+        description = (
+            f"Account already transferred {amount_today} cents today; adding {requested_amount} "
+            f"cents exceeds the daily limit of {daily_limit} cents."
+        )
+        translation = "A transferência excede o limite diário disponível da conta."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class FundingReferenceConflict(QIException):
+    code = "QIT004006"
+
+    def __init__(self, funding_reference) -> None:
+        title = "Funding reference conflict"
+        http_status = 409
+        description = f"The funding reference {funding_reference} was already applied."
+        translation = "A referência externa deste aporte já foi utilizada."
         super().__init__(title, self.code, http_status, description, translation)
 
 

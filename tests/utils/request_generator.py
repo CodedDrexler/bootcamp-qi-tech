@@ -100,6 +100,26 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
+    def PUT_account_limits(account_key: str, payload: dict) -> BaseConnectorResponse:
+        response = ClientRequisition.send(
+            "PUT",
+            f"/account/{account_key}/limits",
+            payload=payload,
+            headers={"INTERNAL-TOKEN": INTERNAL_TOKEN},
+        )
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def PUT_account_status(account_key: str, status: str) -> BaseConnectorResponse:
+        response = ClientRequisition.send(
+            "PUT",
+            f"/webhook/account/{account_key}/status",
+            payload={"status": status},
+            headers={"INTERNAL-TOKEN": INTERNAL_TOKEN},
+        )
+        return response.response_status, response.response_json
+
+    @staticmethod
     def POST_transaction(
         account_key: str,
         transaction_payload: dict,
@@ -133,3 +153,30 @@ class RequestGenerator:
         )
         return response.response_status, response.response_json
 
+
+    @staticmethod
+    def GET_transfer_billing_configuration(headers: dict | None = None) -> BaseConnectorResponse:
+        request_headers = {"INTERNAL-TOKEN": INTERNAL_TOKEN}
+        if headers:
+            request_headers.update(headers)
+        response = ClientRequisition.send(
+            "GET",
+            "/billing_configuration/transfer",
+            headers=request_headers,
+        )
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def PUT_transfer_billing_configuration(
+        payload: dict, headers: dict | None = None
+    ) -> BaseConnectorResponse:
+        request_headers = {"INTERNAL-TOKEN": INTERNAL_TOKEN}
+        if headers:
+            request_headers.update(headers)
+        response = ClientRequisition.send(
+            "PUT",
+            "/billing_configuration/transfer",
+            payload=payload,
+            headers=request_headers,
+        )
+        return response.response_status, response.response_json

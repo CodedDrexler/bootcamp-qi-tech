@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from database import Context
 from models import BankTransaction, TransactionType
@@ -24,12 +24,14 @@ class TransactionRepository:
         destination_account,
         amount: int,
         request_control_key: str,
+        external_reference: str,
         operation_key: str | None = None,
     ) -> BankTransaction:
         transaction = BankTransaction()
         transaction.transaction_key = str(uuid4())
         transaction.operation_key = operation_key or str(uuid4())
         transaction.request_control_key = request_control_key
+        transaction.external_reference = external_reference
         transaction.type = self.get_type(TransactionType.DEPOSIT)
         transaction.destination_account = destination_account
         transaction.amount = amount
@@ -48,6 +50,7 @@ class TransactionRepository:
         transaction.transaction_key = str(uuid4())
         transaction.operation_key = operation_key or str(uuid4())
         transaction.request_control_key = request_control_key
+        transaction.external_reference = None
         transaction.type = self.get_type(TransactionType.TRANSFER)
         transaction.origin_account = origin_account
         transaction.destination_account = destination_account
@@ -60,6 +63,7 @@ class TransactionRepository:
         transaction.transaction_key = str(uuid4())
         transaction.operation_key = operation_key
         transaction.request_control_key = None
+        transaction.external_reference = None
         transaction.type = self.get_type(TransactionType.FEE)
         transaction.origin_account = origin_account
         transaction.amount = amount
@@ -70,6 +74,13 @@ class TransactionRepository:
         return (
             self.session.query(BankTransaction)
             .filter(BankTransaction.request_control_key == request_control_key)
+            .first()
+        )
+
+    def get_by_external_reference(self, external_reference: str) -> BankTransaction:
+        return (
+            self.session.query(BankTransaction)
+            .filter(BankTransaction.external_reference == external_reference)
             .first()
         )
 
@@ -84,6 +95,19 @@ class TransactionRepository:
             .first()
         )
 
+    def outgoing_transfer_amount_today(self, account_id: int) -> int:
+        value = (
+            self.session.query(func.coalesce(func.sum(BankTransaction.amount), 0))
+            .join(BankTransaction.type)
+            .filter(
+                BankTransaction.origin_account_id == account_id,
+                TransactionType.enumerator == TransactionType.TRANSFER,
+                func.date(BankTransaction.created_at) == func.current_date(),
+            )
+            .scalar()
+        )
+        return int(value or 0)
+
     def list_page_for_account(self, account_id: int, limit: int, offset: int) -> list[BankTransaction]:
         query = (
             self.session.query(BankTransaction)
@@ -95,5 +119,4 @@ class TransactionRepository:
             )
             .order_by(BankTransaction.created_at.desc(), BankTransaction.id.desc())
         )
-
         return query.limit(limit + 1).offset(offset).all()

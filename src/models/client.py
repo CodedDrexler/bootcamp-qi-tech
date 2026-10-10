@@ -19,4 +19,4 @@ class Client(Base):
         UniqueConstraint("document_number"),
     )
 
-    accounts = relationship("Account", back_populates="client")
+    account = relationship("Account", back_populates="client", uselist=False)
