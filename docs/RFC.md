@@ -1,6 +1,6 @@
 # RFC — Banco simples com saldo consistente, limites e pricing explícito
 
-**TIME:** `<PREENCHER NOMES DA DUPLA>`
+**TIME:** `<Vinicius Drexler e Wallace Teixeira>`
 **DATA:** 09/10/2026
 **VERSÃO:** 1
 
