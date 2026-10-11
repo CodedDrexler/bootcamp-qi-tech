@@ -1,2 +1,6 @@
 from resources.health_check import HealthCheckResource
 from resources.sample_entity import SampleEntityResource
+from resources.client import ClientResource
+from resources.account import AccountResource
+from resources.transaction import TransactionResource
+from resources.billing_configuration import BillingConfigurationResource

@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from constants import BYPASS_ENDPOINTS, INTERNAL_TOKEN
 from errors.base_error import ForbiddenNotInternal
 from errors.handlers import qi_exception_to_response
+from utils.structured_log import emit_event
 
 
 def register_internal_token_middleware(application: FastAPI) -> None:
@@ -25,6 +26,15 @@ def register_internal_token_middleware(application: FastAPI) -> None:
             return await call_next(request)
 
         if request.headers.get("INTERNAL-TOKEN") != INTERNAL_TOKEN:
-            return qi_exception_to_response(ForbiddenNotInternal())
+            error = ForbiddenNotInternal()
+            emit_event(
+                "access_rejected",
+                code=error.code,
+                http_status=error.http_status,
+                method=request.method,
+                path=request.url.path,
+                reason="invalid_internal_token",
+            )
+            return qi_exception_to_response(error)
 
         return await call_next(request)

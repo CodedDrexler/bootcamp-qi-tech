@@ -9,7 +9,14 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import HealthCheckResource, SampleEntityResource
+from resources import (
+    BillingConfigurationResource,
+    AccountResource,
+    ClientResource,
+    HealthCheckResource,
+    SampleEntityResource,
+    TransactionResource,
+)
 from utils.logger import setup_logging
 
 
@@ -124,6 +131,10 @@ def create_app() -> FastAPI:
     # atende cada endereço, e mais nada.
     health_check_resource = HealthCheckResource()
     sample_entity_resource = SampleEntityResource()
+    client_resource = ClientResource()
+    account_resource = AccountResource()
+    transaction_resource = TransactionResource()
+    billing_configuration_resource = BillingConfigurationResource()
 
     application.add_api_route("/", health_check_resource.on_get_home, methods=["GET"])
     application.add_api_route(
@@ -155,6 +166,58 @@ def create_app() -> FastAPI:
     application.add_api_route(
         "/sample_entities",
         sample_entity_resource.on_get_list,
+        methods=["GET"],
+    )
+
+    # Domínio bancário
+    application.add_api_route(
+        "/client",
+        client_resource.on_post,
+        methods=["POST"],
+    )
+    application.add_api_route(
+        "/client/{client_key}",
+        client_resource.on_get_by_key,
+        methods=["GET"],
+    )
+    application.add_api_route(
+        "/client/{client_key}/account",
+        account_resource.on_post,
+        methods=["POST"],
+    )
+    application.add_api_route(
+        "/account/{account_key}",
+        account_resource.on_get_by_key,
+        methods=["GET"],
+    )
+    application.add_api_route(
+        "/account/{account_key}/limits",
+        account_resource.on_put_limits,
+        methods=["PUT"],
+    )
+    application.add_api_route(
+        "/webhook/account/{account_key}/status",
+        account_resource.on_put_status,
+        methods=["PUT"],
+    )
+    application.add_api_route(
+        "/billing_configuration/transfer",
+        billing_configuration_resource.on_get_transfer,
+        methods=["GET"],
+    )
+    application.add_api_route(
+        "/billing_configuration/transfer",
+        billing_configuration_resource.on_put_transfer,
+        methods=["PUT"],
+    )
+    application.add_api_route(
+        "/account/{account_key}/transaction",
+        transaction_resource.on_post,
+        methods=["POST"],
+    )
+    application.add_api_route(
+        "/account/{account_key}/transactions",
+        transaction_resource.on_get_list,
         methods=["GET"],
     )
 

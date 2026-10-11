@@ -38,6 +38,22 @@ BYPASS_ENDPOINTS = [
 
 REQUIRED_VARIABLES = ["DATABASE_URL", "INTERNAL_TOKEN"]
 
+# Regras de produto versionadas em codigo. Nao sao segredos nem detalhes de
+# infraestrutura: mudar uma delas muda o comportamento do banco e deve vir
+# acompanhado de teste + RFC.
+MINIMUM_CLIENT_AGE = 18
+
+# Teto técnico do contrato para este MVP de pessoa física. Não é o limite
+# operacional de transferência: risco é controlado por limites por conta.
+# R$ 1.000.000,00 em centavos.
+MAX_TRANSACTION_AMOUNT_CENTS = 100_000_000
+
+# Perfil inicial de risco do MVP. São defaults da nossa solução, não limites
+# universais da QI Tech. Ficam persistidos na conta e podem ser ajustados
+# pelo endpoint interno de configuração de limites.
+DEFAULT_SINGLE_TRANSFER_LIMIT_CENTS = 500_000   # R$ 5.000,00
+DEFAULT_DAILY_TRANSFER_LIMIT_CENTS = 2_000_000  # R$ 20.000,00
+
 
 def check_variables():
     missing = []
