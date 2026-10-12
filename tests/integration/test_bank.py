@@ -7,7 +7,10 @@ from uuid import uuid4
 import pytest
 import requests
 
-BASE = os.getenv("BANK_API_URL", "http://127.0.0.1:3000")
+BASE = os.getenv(
+    "BANK_API_URL",
+    f"http://{os.getenv('SERVER_LOCALHOST', '127.0.0.1')}:{os.getenv('API_PORT', '3000')}",
+)
 TOKEN = os.getenv("INTERNAL_TOKEN", "default_token")
 
 

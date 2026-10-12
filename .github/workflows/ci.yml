@@ -19,6 +19,9 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: docker compose up --build --wait --wait-timeout 180
       - run: pytest -v --junitxml=tmp/results.xml
+      - run: docker compose --profile observability up -d --wait --wait-timeout 90
+      - run: docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml
+      - run: python scripts/check_monitoring.py
       - name: Logs when failing
         if: failure()
         run: docker compose logs --no-color
@@ -28,4 +31,4 @@ jobs:
           name: test-results
           path: tmp/results.xml
       - if: always()
-        run: docker compose down
+        run: docker compose --profile observability down
