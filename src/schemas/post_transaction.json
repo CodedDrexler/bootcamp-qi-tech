@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "type": {
+      "enum": [
+        "DEPOSIT",
+        "WITHDRAWAL",
+        "TRANSFER"
+      ]
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9000000000000000
+    },
+    "destination_account_key": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  },
+  "required": [
+    "type",
+    "amount"
+  ],
+  "additionalProperties": false
+}

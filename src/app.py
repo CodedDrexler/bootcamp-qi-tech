@@ -10,6 +10,7 @@ from middlewares import (
     register_session_manager_middleware,
 )
 from resources import HealthCheckResource, SampleEntityResource
+from resources.bank import register_bank_routes
 from utils.logger import setup_logging
 
 
@@ -158,6 +159,7 @@ def create_app() -> FastAPI:
         methods=["GET"],
     )
 
+    register_bank_routes(application)
     register_error_handlers(application)
 
     return application
