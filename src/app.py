@@ -18,6 +18,7 @@ from resources import (
     TransactionResource,
 )
 from utils.logger import setup_logging
+from resources.piggy_bank import register_piggy_bank_routes
 
 
 def create_app() -> FastAPI:
@@ -221,6 +222,7 @@ def create_app() -> FastAPI:
         methods=["GET"],
     )
 
+    register_piggy_bank_routes(application)
     register_error_handlers(application)
 
     return application

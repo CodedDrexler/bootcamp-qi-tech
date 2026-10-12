@@ -17,6 +17,10 @@ from models import AccountStatus, BillingConfiguration, TransactionType
 from repositories import AccountRepository, BillingConfigurationRepository, TransactionRepository
 from utils.structured_log import emit_event
 from utils.identifiers import canonical_uuid
+from controllers.banking_access import owned_account
+from dtos.piggy_bank_dto import PiggyBankDTO
+from errors.piggy_bank_errors import InsufficientReservedBalance, PiggyBankNotFound, PiggyBankNotOperational
+from repositories.piggy_bank_repository import PiggyBankRepository
 
 
 class TransactionController(BaseController):
@@ -27,6 +31,34 @@ class TransactionController(BaseController):
         self.account_repository = AccountRepository(self.context)
         self.transaction_repository = TransactionRepository(self.context)
         self.billing_repository = BillingConfigurationRepository(self.context)
+        self.piggy_repository = PiggyBankRepository(self.context)
+
+    def create_piggy_movement(self, account_key, piggy_key, data, identity):
+        account = owned_account(self.account_repository,account_key,identity,lock=True)
+        piggy = self.piggy_repository.get_by_key(account.id,piggy_key,for_update=True)
+        if piggy is None:
+            raise PiggyBankNotFound()
+        kind, amount, key = data["type"], data["amount"], canonical_uuid(data["request_control_key"])
+        origin = account.account_key if kind == TransactionType.RESERVE else None
+        destination = account.account_key if kind == TransactionType.REDEEM else None
+        replay = self._get_replay_if_matches(key,kind,amount,origin,destination,None,piggy.piggy_bank_key)
+        if replay is not None:
+            return replay
+        self._require_operational_account(account)
+        if piggy.status != "active":
+            raise PiggyBankNotOperational()
+        if kind == TransactionType.RESERVE:
+            if account.balance < amount:
+                raise InsufficientBalance(account.balance,amount)
+            self.account_repository.subtract_balance(account,amount)
+            piggy.balance += amount
+        else:
+            if piggy.balance < amount:
+                raise InsufficientReservedBalance()
+            self.account_repository.add_balance(account,amount)
+            piggy.balance -= amount
+        transaction = self.transaction_repository.create_piggy_movement(account,piggy,kind,amount,key)
+        return self._flush_commit_or_replay(transaction,0,key,kind,amount,origin,destination,None,piggy.piggy_bank_key)
 
     def create(self, account_key: str, transaction_data: dict, requester_client_key: str | None) -> dict:
         account_key = canonical_uuid(account_key)
@@ -199,6 +231,7 @@ class TransactionController(BaseController):
         expected_origin_key: str | None,
         expected_destination_key: str | None,
         expected_external_reference: str | None,
+        expected_piggy_key: str | None = None,
     ) -> dict | None:
         existing = self.transaction_repository.get_by_request_control_key(request_control_key)
         if existing is None:
@@ -212,6 +245,7 @@ class TransactionController(BaseController):
             and origin_key == expected_origin_key
             and destination_key == expected_destination_key
             and existing.external_reference == expected_external_reference
+            and (existing.piggy_bank.piggy_bank_key if existing.piggy_bank is not None else None) == expected_piggy_key
         )
         if not same_request:
             emit_event(
@@ -222,6 +256,8 @@ class TransactionController(BaseController):
             )
             raise RequestControlKeyConflict(request_control_key)
 
+        if existing.piggy_bank is not None:
+            return PiggyBankDTO.operation_to_dict(existing)
         fee = self.transaction_repository.get_fee_by_operation_key(existing.operation_key)
         return TransactionDTO.operation_to_dict(existing, fee_amount=fee.amount if fee is not None else 0)
 
@@ -235,6 +271,7 @@ class TransactionController(BaseController):
         expected_origin_key: str | None,
         expected_destination_key: str | None,
         expected_external_reference: str | None,
+        expected_piggy_key: str | None = None,
     ) -> dict:
         try:
             self.session.flush()
@@ -242,7 +279,7 @@ class TransactionController(BaseController):
             self.session.rollback()
             replay = self._get_replay_if_matches(
                 request_control_key, expected_type, expected_amount,
-                expected_origin_key, expected_destination_key, expected_external_reference,
+                expected_origin_key, expected_destination_key, expected_external_reference, expected_piggy_key,
             )
             if replay is not None:
                 self._log_financial_result(
@@ -254,7 +291,8 @@ class TransactionController(BaseController):
                     raise FundingReferenceConflict(expected_external_reference)
             raise
 
-        response = TransactionDTO.operation_to_dict(transaction, fee_amount=fee_amount)
+        response = (PiggyBankDTO.operation_to_dict(transaction) if transaction.piggy_bank is not None
+                    else TransactionDTO.operation_to_dict(transaction, fee_amount=fee_amount))
         self.session.commit()
         self._log_financial_result(
             expected_type, expected_amount, fee_amount, "committed", response.get("operation_key")

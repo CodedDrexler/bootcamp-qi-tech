@@ -41,7 +41,10 @@ class TransactionDTO:
                 if transaction.origin_account is not None:
                     counterparty_account_key = transaction.origin_account.account_key
 
-        else:  # fee
+        elif transaction_type == TransactionType.REDEEM:
+            direction = "credit"
+            balance_effect = transaction.amount
+        else:  # fee or reserve
             direction = "debit"
             balance_effect = -transaction.amount
 

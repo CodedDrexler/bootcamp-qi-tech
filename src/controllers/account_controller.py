@@ -14,6 +14,7 @@ from errors import (
 from models import AccountStatus
 from repositories import AccountRepository, ClientRepository
 from utils.identifiers import canonical_uuid
+from repositories.piggy_bank_repository import PiggyBankRepository
 
 
 class AccountController(BaseController):
@@ -23,6 +24,7 @@ class AccountController(BaseController):
         super().__init__(__name__)
         self.client_repository = ClientRepository(self.context)
         self.account_repository = AccountRepository(self.context)
+        self.piggy_repository = PiggyBankRepository(self.context)
 
     def create(self, client_key: str, requester_client_key: str | None) -> dict:
         client_key, requester_client_key = canonical_uuid(client_key), canonical_uuid(requester_client_key)
@@ -88,8 +90,11 @@ class AccountController(BaseController):
         if old_status == AccountStatus.CLOSED and new_status != AccountStatus.CLOSED:
             raise AccountFinalStatus(old_status, new_status)
 
-        if new_status == AccountStatus.CLOSED and account.balance != 0:
-            raise AccountMustHaveZeroBalanceToClose(account_key, account.balance)
+        if new_status == AccountStatus.CLOSED:
+            total = account.balance + self.piggy_repository.reserved_balance(account.id)
+            if total != 0:
+                raise AccountMustHaveZeroBalanceToClose(account_key, total)
+            self.piggy_repository.close_empty_for_account(account.id)
 
         if old_status != new_status:
             self.account_repository.update_status(account, new_status)

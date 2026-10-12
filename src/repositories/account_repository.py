@@ -58,6 +58,7 @@ class AccountRepository:
             .filter(Account.account_key.in_(distinct_keys))
             .order_by(Account.account_key.asc())
             .with_for_update()
+            .populate_existing()
             .all()
         )
 

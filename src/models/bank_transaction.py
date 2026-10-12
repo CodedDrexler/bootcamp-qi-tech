@@ -16,7 +16,10 @@ class BankTransaction(Base):
     origin_account_id = Column(Integer, ForeignKey("account.id"), nullable=True)
     destination_account_id = Column(Integer, ForeignKey("account.id"), nullable=True)
     amount = Column(BigInteger, nullable=False)
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    piggy_bank_id = Column(Integer, ForeignKey("piggy_bank.id"), nullable=True)
+    account_balance_after = Column(BigInteger, nullable=True)
+    piggy_balance_after = Column(BigInteger, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.clock_timestamp())
 
     __table_args__ = (
         UniqueConstraint("transaction_key"),
@@ -41,3 +44,4 @@ class BankTransaction(Base):
     type = relationship("TransactionType", foreign_keys=[type_id], lazy="selectin")
     origin_account = relationship("Account", foreign_keys=[origin_account_id], lazy="selectin")
     destination_account = relationship("Account", foreign_keys=[destination_account_id], lazy="selectin")
+    piggy_bank = relationship("PiggyBank", foreign_keys=[piggy_bank_id], lazy="selectin")

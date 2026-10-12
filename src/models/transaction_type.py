@@ -15,3 +15,5 @@ class TransactionType(Base):
     DEPOSIT = "deposit"
     TRANSFER = "transfer"
     FEE = "fee"
+    RESERVE = "reserve"
+    REDEEM = "redeem"

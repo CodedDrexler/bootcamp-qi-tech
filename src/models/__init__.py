@@ -9,3 +9,4 @@ from models.account_status_event import AccountStatusEvent
 from models.transaction_type import TransactionType
 from models.bank_transaction import BankTransaction
 from models.billing_configuration import BillingConfiguration
+from models.piggy_bank import PiggyBank, PiggyBankEvent

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "expected_version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "status": {
+      "const": "closed"
+    }
+  },
+  "required": [
+    "expected_version",
+    "status"
+  ],
+  "additionalProperties": false
+}

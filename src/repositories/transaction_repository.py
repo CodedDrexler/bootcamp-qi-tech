@@ -70,6 +70,17 @@ class TransactionRepository:
         self.session.add(transaction)
         return transaction
 
+    def create_piggy_movement(self, account, piggy, kind, amount, key):
+        transaction = BankTransaction(transaction_key=str(uuid4()), operation_key=str(uuid4()),
+            request_control_key=key, type=self.get_type(kind), amount=amount,
+            piggy_bank=piggy, account_balance_after=account.balance,piggy_balance_after=piggy.balance)
+        if kind == TransactionType.RESERVE:
+            transaction.origin_account = account
+        else:
+            transaction.destination_account = account
+        self.session.add(transaction)
+        return transaction
+
     def get_by_request_control_key(self, request_control_key: str) -> BankTransaction:
         return (
             self.session.query(BankTransaction)
