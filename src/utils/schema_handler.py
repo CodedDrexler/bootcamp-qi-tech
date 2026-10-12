@@ -2,10 +2,18 @@ import functools
 import json
 import os
 
-from jsonschema import RefResolver, ValidationError, validate
+from jsonschema import Draft7Validator, RefResolver, ValidationError, validators
 
 from constants import SCHEMA_PATH
 from errors import InvalidSchema
+
+
+StrictValidator = validators.extend(Draft7Validator, type_checker=Draft7Validator.TYPE_CHECKER.redefine(
+    "integer", lambda checker, value: type(value) is int))
+
+
+def validate(instance, schema, resolver):
+    StrictValidator(schema, resolver=resolver).validate(instance)
 
 
 class SchemaCache:

@@ -16,6 +16,7 @@ from errors import (
 from models import AccountStatus, BillingConfiguration, TransactionType
 from repositories import AccountRepository, BillingConfigurationRepository, TransactionRepository
 from utils.structured_log import emit_event
+from utils.identifiers import canonical_uuid
 
 
 class TransactionController(BaseController):
@@ -28,12 +29,18 @@ class TransactionController(BaseController):
         self.billing_repository = BillingConfigurationRepository(self.context)
 
     def create(self, account_key: str, transaction_data: dict, requester_client_key: str | None) -> dict:
+        account_key = canonical_uuid(account_key)
+        requester_client_key = canonical_uuid(requester_client_key)
+        transaction_data = {k: canonical_uuid(v) if k.endswith("key") or k == "funding_reference" else v
+                            for k, v in transaction_data.items()}
         self._require_identity(requester_client_key)
         if transaction_data["type"] == TransactionType.DEPOSIT:
             return self._deposit(account_key, transaction_data, requester_client_key)
         return self._transfer(account_key, transaction_data, requester_client_key)
 
     def get_statement(self, account_key: str, requester_client_key: str | None, limit: int, offset: int) -> dict:
+        account_key = canonical_uuid(account_key)
+        requester_client_key = canonical_uuid(requester_client_key)
         self._require_identity(requester_client_key)
         account = self.account_repository.get_by_key(account_key)
         if account is None or account.client.client_key != requester_client_key:

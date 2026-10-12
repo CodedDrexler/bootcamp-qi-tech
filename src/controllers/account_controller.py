@@ -13,6 +13,7 @@ from errors import (
 )
 from models import AccountStatus
 from repositories import AccountRepository, ClientRepository
+from utils.identifiers import canonical_uuid
 
 
 class AccountController(BaseController):
@@ -24,6 +25,7 @@ class AccountController(BaseController):
         self.account_repository = AccountRepository(self.context)
 
     def create(self, client_key: str, requester_client_key: str | None) -> dict:
+        client_key, requester_client_key = canonical_uuid(client_key), canonical_uuid(requester_client_key)
         self._require_identity(requester_client_key)
 
         if requester_client_key != client_key:
@@ -51,6 +53,7 @@ class AccountController(BaseController):
         return account_dto
 
     def get_by_key(self, account_key: str, requester_client_key: str | None) -> dict:
+        account_key, requester_client_key = canonical_uuid(account_key), canonical_uuid(requester_client_key)
         self._require_identity(requester_client_key)
 
         account = self.account_repository.get_by_key(account_key)
@@ -60,7 +63,8 @@ class AccountController(BaseController):
         return AccountDTO.obj_to_dict(account)
 
     def update_limits(self, account_key: str, limits: dict) -> dict:
-        account = self.account_repository.get_by_key(account_key)
+        account_key = canonical_uuid(account_key)
+        account = next(iter(self.account_repository.get_many_for_update([account_key])), None)
         if account is None:
             raise AccountNotFound(account_key)
 
@@ -75,7 +79,8 @@ class AccountController(BaseController):
         return response
 
     def update_status(self, account_key: str, new_status: str) -> dict:
-        account = self.account_repository.get_by_key(account_key)
+        account_key = canonical_uuid(account_key)
+        account = next(iter(self.account_repository.get_many_for_update([account_key])), None)
         if account is None:
             raise AccountNotFound(account_key)
 

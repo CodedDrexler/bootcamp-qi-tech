@@ -79,3 +79,5 @@ coverage.xml
 
 # --- Artefatos operacionais locais --------------------------
 artifacts/
+tmp/
+*.log

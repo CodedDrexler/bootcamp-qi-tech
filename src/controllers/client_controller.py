@@ -16,6 +16,7 @@ from errors import (
 )
 from repositories import ClientRepository
 from utils.document_number import is_valid_cpf
+from utils.identifiers import canonical_uuid
 
 
 class ClientController(BaseController):
@@ -59,6 +60,7 @@ class ClientController(BaseController):
         return client_dto
 
     def get_by_key(self, client_key: str, requester_client_key: str | None) -> dict:
+        client_key, requester_client_key = canonical_uuid(client_key), canonical_uuid(requester_client_key)
         self._require_identity(requester_client_key)
 
         # Para não confirmar a existência de outro cliente, identidade
