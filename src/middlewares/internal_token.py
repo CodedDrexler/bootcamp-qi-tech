@@ -1,3 +1,5 @@
+from secrets import compare_digest
+
 from fastapi import FastAPI, Request
 
 from constants import BYPASS_ENDPOINTS, INTERNAL_TOKEN
@@ -24,7 +26,7 @@ def register_internal_token_middleware(application: FastAPI) -> None:
         if request.method == "OPTIONS" or is_public:
             return await call_next(request)
 
-        if request.headers.get("INTERNAL-TOKEN") != INTERNAL_TOKEN:
+        if not compare_digest(request.headers.get("INTERNAL-TOKEN", "").encode(), INTERNAL_TOKEN.encode()):
             return qi_exception_to_response(ForbiddenNotInternal())
 
         return await call_next(request)

@@ -11,6 +11,7 @@ from middlewares import (
 )
 from resources import HealthCheckResource, SampleEntityResource
 from resources.bank import register_bank_routes
+from middlewares.metrics import register_metrics
 from utils.logger import setup_logging
 
 
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
     register_session_manager_middleware(application)
     register_internal_token_middleware(application)
     register_request_logger_middleware(application)
+    register_metrics(application)
     register_request_context_middleware(application)
 
     # ────────────────────────────────────────────────────────────────

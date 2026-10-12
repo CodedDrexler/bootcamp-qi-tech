@@ -12,6 +12,8 @@ from errors.base_error import (
     NotFoundResource,
 )
 from utils.logger import get_logger
+from sqlalchemy.exc import OperationalError, TimeoutError as PoolTimeout
+from errors.bank_errors import BankUnavailable
 
 
 logger = get_logger(__name__)
@@ -48,6 +50,12 @@ def describe_validation_error(error: dict) -> str:
 
 def register_error_handlers(application: FastAPI) -> None:
     """Ensina a aplicação a responder cada tipo de erro."""
+
+    @application.exception_handler(OperationalError)
+    @application.exception_handler(PoolTimeout)
+    def handle_database_unavailable(request: Request, exception) -> JSONResponse:
+        logger.error("Database unavailable or timed out")
+        return qi_exception_to_response(BankUnavailable())
 
     @application.exception_handler(QIException)
     def handle_qi_exception(request: Request, exception: QIException) -> JSONResponse:

@@ -3,10 +3,34 @@ import hashlib
 import json
 from sqlalchemy.exc import IntegrityError
 from controllers.base_controller import BaseController
-from dtos.bank_dto import account_dto, customer_dto, entry_dto, event_dto, page_dto, piggy_dto, transaction_dto
-from errors.bank_errors import BalanceLimit, BankNotFound, DuplicateBankEntity, IdempotencyConflict, InsufficientBalance, InvalidBankState, InvalidCustomer
+from dtos.bank_dto import (
+    account_dto,
+    customer_dto,
+    entry_dto,
+    event_dto,
+    page_dto,
+    piggy_dto,
+    transaction_dto,
+)
+from errors.bank_errors import (
+    BalanceLimit,
+    BankNotFound,
+    DuplicateBankEntity,
+    IdempotencyConflict,
+    InsufficientBalance,
+    InvalidBankState,
+    InvalidCustomer,
+)
 from errors.base_error import InvalidSchema
-from models.bank import MAX_MONEY, Account, BankTransaction, Customer, LedgerEntry, PiggyBank, StatusEvent
+from models.bank import (
+    MAX_MONEY,
+    Account,
+    BankTransaction,
+    Customer,
+    LedgerEntry,
+    PiggyBank,
+    StatusEvent,
+)
 from repositories.bank_repository import BankRepository
 from utils.document_number import is_valid_cpf
 
@@ -19,7 +43,11 @@ class BankController(BaseController):
         self.repo = BankRepository(self.session)
 
     def execute(self, scope, key, payload, operation):
-        fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            ).encode()
+        ).hexdigest()
         try:
             record, new = self.repo.claim(scope, key, fingerprint)
             if record.fingerprint != fingerprint:
@@ -47,10 +75,19 @@ class BankController(BaseController):
         except ValueError:
             raise InvalidCustomer("Invalid birthdate.") from None
         today = date.today()
-        age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+        age = (
+            today.year
+            - birth.year
+            - ((today.month, today.day) < (birth.month, birth.day))
+        )
         if age < 18 or age > 120:
             raise InvalidCustomer("Age must be between 18 and 120 years.")
-        data = {**payload, "birthdate": birth, "email": payload["email"].strip().lower(), "name": payload["name"].strip()}
+        data = {
+            **payload,
+            "birthdate": birth,
+            "email": payload["email"].strip().lower(),
+            "name": payload["name"].strip(),
+        }
         c = self.repo.add(Customer, **data)
         return {"customer_key": c.customer_key}
 
@@ -67,7 +104,11 @@ class BankController(BaseController):
         return {"account_key": a.account_key}
 
     def account(self, key, lock=False):
-        a = (self.repo.lock_accounts([key]) or [None])[0] if lock else self.repo.find(Account, account_key=key)
+        a = (
+            (self.repo.lock_accounts([key]) or [None])[0]
+            if lock
+            else self.repo.find(Account, account_key=key)
+        )
         if a is None:
             raise BankNotFound("Account")
         return a
@@ -89,7 +130,9 @@ class BankController(BaseController):
     def get_account(self, key):
         # The parent lock gives a consistent snapshot across checking and reserves.
         a = self.account(key, lock=True)
-        response = account_dto(a, self.repo.customer_for_account(a).customer_key, self.repo.piggies(a.id))
+        response = account_dto(
+            a, self.repo.customer_for_account(a).customer_key, self.repo.piggies(a.id)
+        )
         response["status_events"] = [event_dto(e) for e in self.repo.events(a.id)]
         return response
 
@@ -98,7 +141,9 @@ class BankController(BaseController):
         if a.status == "CLOSED":
             return self.get_account(key)
         if a.balance or any(p.balance for p in self.repo.piggies(a.id)):
-            raise InvalidBankState("Checking and reserves must be empty before closing.")
+            raise InvalidBankState(
+                "Checking and reserves must be empty before closing."
+            )
         a.status = "CLOSED"
         self.repo.add(StatusEvent, account_id=a.id, status="CLOSED")
         response = self.get_account(key)
@@ -107,15 +152,24 @@ class BankController(BaseController):
 
     def entry(self, t, amount, kind, account=None, piggy=None, pocket="CHECKING"):
         after = piggy.balance if piggy else (account.balance if account else None)
-        self.repo.add(LedgerEntry, transaction_id=t.id, account_id=account.id if account else None,
-                      piggy_bank_id=piggy.id if piggy else None, pocket=pocket, type=kind,
-                      amount=amount, balance_after=after)
+        self.repo.add(
+            LedgerEntry,
+            transaction_id=t.id,
+            account_id=account.id if account else None,
+            piggy_bank_id=piggy.id if piggy else None,
+            pocket=pocket,
+            type=kind,
+            amount=amount,
+            balance_after=after,
+        )
 
     def transact(self, key, payload):
         kind, amount = payload["type"], payload["amount"]
         dest_key = payload.get("destination_account_key")
         if (kind == "TRANSFER") != (dest_key is not None):
-            raise InvalidSchema("destination_account_key is required only for TRANSFER.")
+            raise InvalidSchema(
+                "destination_account_key is required only for TRANSFER."
+            )
         if dest_key == key:
             raise InvalidBankState("An account cannot transfer to itself.")
         keys = [key, dest_key] if dest_key else [key]
@@ -148,13 +202,23 @@ class BankController(BaseController):
     def create_piggy(self, key, payload):
         a = self.account(key, lock=True)
         self.active(a)
-        p = self.repo.add(PiggyBank, account_id=a.id, name=payload["name"].strip(),
-                          target_amount=payload["target_amount"], balance=0, status="ACTIVE")
+        p = self.repo.add(
+            PiggyBank,
+            account_id=a.id,
+            name=payload["name"].strip(),
+            target_amount=payload["target_amount"],
+            balance=0,
+            status="ACTIVE",
+        )
         self.repo.add(StatusEvent, account_id=a.id, piggy_bank_id=p.id, status="ACTIVE")
         return {"piggy_bank_key": p.piggy_bank_key}
 
     def piggy(self, a, key, lock=False):
-        p = self.repo.lock_piggy(a.id, key) if lock else self.repo.find(PiggyBank, account_id=a.id, piggy_bank_key=key)
+        p = (
+            self.repo.lock_piggy(a.id, key)
+            if lock
+            else self.repo.find(PiggyBank, account_id=a.id, piggy_bank_key=key)
+        )
         if p is None:
             raise BankNotFound("Piggy bank")
         return p
@@ -196,17 +260,32 @@ class BankController(BaseController):
     def statement(self, key, piggy_key, limit, page):
         a = self.account(key)
         pid = self.piggy(a, piggy_key).id if piggy_key else None
-        return page_dto(self.repo.statement(a.id, pid, limit, page), limit, page, entry_dto)
+        return page_dto(
+            self.repo.statement(a.id, pid, limit, page), limit, page, entry_dto
+        )
 
     def list_customers(self, limit, page):
-        return page_dto(self.repo.page(Customer, limit, page), limit, page, customer_dto)
+        return page_dto(
+            self.repo.page(Customer, limit, page), limit, page, customer_dto
+        )
 
     def list_accounts(self, limit, page):
         def convert(a):
-            return {"account_key": a.account_key, "customer_key": self.repo.customer_for_account(a).customer_key,
-                    "balance": a.balance, "status": a.status, "currency": "BRL"}
+            return {
+                "account_key": a.account_key,
+                "customer_key": self.repo.customer_for_account(a).customer_key,
+                "balance": a.balance,
+                "status": a.status,
+                "currency": "BRL",
+            }
+
         return page_dto(self.repo.page(Account, limit, page), limit, page, convert)
 
     def list_piggies(self, key, limit, page):
         a = self.account(key)
-        return page_dto(self.repo.page(PiggyBank, limit, page, account_id=a.id), limit, page, lambda p: piggy_dto(p, key))
+        return page_dto(
+            self.repo.page(PiggyBank, limit, page, account_id=a.id),
+            limit,
+            page,
+            lambda p: piggy_dto(p, key),
+        )

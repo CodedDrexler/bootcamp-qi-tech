@@ -46,8 +46,7 @@ def register_request_logger_middleware(application: FastAPI) -> None:
         # gravado aqui, no histórico do navegador e no log de todo proxy
         # do caminho. Segredo viaja em cabeçalho, como o INTERNAL-TOKEN.
         requested_path = request.url.path
-        if request.url.query:
-            requested_path = f"{requested_path}?{request.url.query}"
+        # Queries can contain CPF, email or accidental secrets; never log values.
 
         started_at = time.perf_counter()
         logger.info(f"ENTROU {request.method} {requested_path}")

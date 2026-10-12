@@ -101,7 +101,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from constants import DATABASE_URL
 
 
-engine = create_engine(DATABASE_URL, pool_size=5, pool_recycle=600, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_size=5, pool_recycle=600, pool_pre_ping=True, pool_timeout=5,
+    connect_args={"connect_timeout": 5, "options": "-c statement_timeout=10000 -c lock_timeout=5000"})
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
